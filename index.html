@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — Personal Finance Dashboard</title>
+    <meta name="description"
+        content="Track your personal finances semester by semester with live Google Sheets integration, analytics, and beautiful charts." />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p class="loading-text" id="loadingText">Fetching data from Google Sheets…</p>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- App Layout -->
+    <div class="app-layout">
+
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" role="navigation" aria-label="Main navigation">
+            <div class="sidebar-logo">
+                <div class="logo-icon" aria-hidden="true">💰</div>
+                <div class="logo-text">
+                    <h1>FinTrack</h1>
+                    <p>Personal Finance</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <span class="nav-section-label">Overview</span>
+                <a class="nav-item active" id="nav-dashboard" href="#"
+                    onclick="App.navigate('dashboard'); return false;" aria-current="page">
+                    <span class="nav-icon" aria-hidden="true">🏠</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+
+                <span class="nav-section-label">Analysis</span>
+                <a class="nav-item" id="nav-monthly" href="#" onclick="App.navigate('monthly'); return false;">
+                    <span class="nav-icon" aria-hidden="true">📅</span>
+                    <span class="nav-label">Monthly Analysis</span>
+                </a>
+                <a class="nav-item" id="nav-category" href="#" onclick="App.navigate('category'); return false;">
+                    <span class="nav-icon" aria-hidden="true">🛒</span>
+                    <span class="nav-label">Categories</span>
+                </a>
+                <a class="nav-item" id="nav-banks" href="#" onclick="App.navigate('banks'); return false;">
+                    <span class="nav-icon" aria-hidden="true">🏦</span>
+                    <span class="nav-label">Bank / Mode</span>
+                </a>
+
+                <span class="nav-section-label">Data</span>
+                <a class="nav-item" id="nav-transactions" href="#"
+                    onclick="App.navigate('transactions'); return false;">
+                    <span class="nav-icon" aria-hidden="true">📋</span>
+                    <span class="nav-label">Transactions</span>
+                </a>
+            </nav>
+
+            <!-- Semester Selector -->
+            <div class="semester-section">
+                <span class="semester-select-label">Semester</span>
+                <select class="semester-select" id="semesterSelect" onchange="App.changeSemester(this.value)"
+                    aria-label="Select semester">
+                    <!-- Populated by JS from CONFIG.SEMESTERS -->
+                </select>
+                <button class="add-semester-btn" onclick="App.openAddSemesterModal()" aria-label="Add new semester"
+                    title="Add New Semester">
+                    <span>＋</span> Add Semester
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===== ADD SEMESTER MODAL ===== -->
+        <div class="modal-backdrop" id="semesterModal" onclick="App.closeModal(event, 'semesterModal')" role="dialog"
+            aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3 id="modalTitle">➕ Add New Semester</h3>
+                    <button class="modal-close" onclick="App.closeModal(null, 'semesterModal')"
+                        aria-label="Close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-desc">Enter the exact name of the new sheet tab as it appears in your Google Sheet.
+                    </p>
+                    <div class="modal-field">
+                        <label for="newSemesterInput">Sheet Tab Name</label>
+                        <input type="text" id="newSemesterInput" placeholder="e.g. SEM - 3 or CKP-2" autocomplete="off"
+                            onkeydown="if(event.key==='Enter') App.confirmAddSemester()" />
+                    </div>
+                    <div class="modal-preview" id="semesterPreview"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn-cancel" onclick="App.closeModal(null, 'semesterModal')">Cancel</button>
+                    <button class="modal-btn-confirm" onclick="App.confirmAddSemester()">Add &amp; Switch</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ADD TRANSACTION MODAL ===== -->
+        <div class="modal-backdrop" id="transactionModal" onclick="App.closeModal(event, 'transactionModal')"
+            role="dialog" aria-modal="true" aria-labelledby="transModalTitle">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3 id="transModalTitle">📝 Add Transaction</h3>
+                    <button class="modal-close" onclick="App.closeModal(null, 'transactionModal')"
+                        aria-label="Close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="transSetupWarning"
+                        style="display:none; margin-bottom:15px; padding:12px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px;">
+                        <p style="font-size:12px; color:#fca5a5; line-height:1.5; margin:0;">
+                            <strong>Setup Required:</strong> To add transactions directly from this app, you must set up
+                            a Google Apps Script Web App and paste its URL into <code>config.js</code> under
+                            <code>ADD_TRANSACTION_WEB_APP_URL</code>.
+                        </p>
+                    </div>
+                    <div class="modal-field">
+                        <label for="transDate">Date</label>
+                        <input type="date" id="transDate" required />
+                    </div>
+                    <div class="modal-field">
+                        <label for="transForWhat">For What</label>
+                        <input type="text" id="transForWhat" placeholder="e.g. Lunch" required autocomplete="off" />
+                    </div>
+                    <div style="display:flex; gap:12px;">
+                        <div class="modal-field" style="flex:1;">
+                            <label for="transAction">Action</label>
+                            <select id="transAction" class="modal-select" required>
+                                <option value="Debit">Debit</option>
+                                <option value="Credit">Credit</option>
+                            </select>
+                        </div>
+                        <div class="modal-field" style="flex:1;">
+                            <label for="transMode">Mode / Bank</label>
+                            <input type="text" id="transMode" placeholder="e.g. UPI, cash" required
+                                autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="modal-field">
+                        <label for="transAmount">Amount (₹)</label>
+                        <input type="number" id="transAmount" placeholder="0" min="0" step="any" required />
+                    </div>
+                    <div class="modal-preview" id="transactionPreview"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn-cancel" onclick="App.closeModal(null, 'transactionModal')">Cancel</button>
+                    <button class="modal-btn-confirm" id="transSubmitBtn" onclick="App.confirmAddTransaction()">Add
+                        Transaction</button>
+                </div>
+            </div>
+        </div>
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="main-content">
+
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <h2 id="pageTitle">Dashboard</h2>
+                    <p id="pageSubtitle">Loading…</p>
+                </div>
+                <div class="header-right">
+                    <div class="status-badge" id="statusBadge">
+                        <div class="status-dot"></div>
+                        <span id="statusText">Not connected</span>
+                    </div>
+                    <button class="refresh-btn" id="refreshBtn" onclick="App.refresh()" aria-label="Refresh data">
+                        <span class="btn-icon" id="refreshIcon">↺</span>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- ===== PAGES ===== -->
+            <div class="page-content">
+
+                <!-- Setup Banner (shown if not configured) -->
+                <div class="setup-banner" id="setupBanner">
+                    <div class="setup-banner-icon">⚙️</div>
+                    <div>
+                        <h3>Quick Setup Required</h3>
+                        <p>
+                            Open <code>config.js</code> in any text editor and paste your Google <strong>Sheet
+                                ID</strong> and <strong>API Key</strong>.<br>
+                            Sheet ID is in your sheet URL:
+                            <code>docs.google.com/spreadsheets/d/<strong>SHEET_ID</strong>/edit</code><br>
+                            Also make sure your sheet is <strong>shared as "Anyone with the link → Viewer"</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ───── DASHBOARD PAGE ───── -->
+                <section class="page active" id="page-dashboard">
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card red">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Total Expenses</span>
+                                <div class="kpi-icon">💸</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-expense">₹0</div>
+                            <div class="kpi-sub">All debits this semester</div>
+                        </div>
+                        <div class="kpi-card green">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Total Earnings</span>
+                                <div class="kpi-icon">💰</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-income">₹0</div>
+                            <div class="kpi-sub">All credits this semester</div>
+                        </div>
+                        <div class="kpi-card blue">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Net Balance</span>
+                                <div class="kpi-icon">⚖️</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-balance">₹0</div>
+                            <div class="kpi-sub" id="kpi-balance-sub">Earnings minus expenses</div>
+                        </div>
+                        <div class="kpi-card purple">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Transactions</span>
+                                <div class="kpi-icon">🔢</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-count">0</div>
+                            <div class="kpi-sub">Total entries</div>
+                        </div>
+                        <div class="kpi-card orange">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Biggest Expense</span>
+                                <div class="kpi-icon">📈</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-biggest">₹0</div>
+                            <div class="kpi-sub" id="kpi-biggest-sub">—</div>
+                        </div>
+                        <div class="kpi-card cyan">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Avg. Monthly Spend</span>
+                                <div class="kpi-icon">📊</div>
+                            </div>
+                            <div class="kpi-value" id="kpi-avg">₹0</div>
+                            <div class="kpi-sub">Average per month</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Charts Row -->
+                    <div class="charts-grid">
+                        <div class="chart-card wide">
+                            <div class="chart-title">Monthly Income vs Expense</div>
+                            <div class="chart-desc">Side-by-side comparison across all months in this semester</div>
+                            <div class="chart-container tall">
+                                <canvas id="monthlyBarChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Expense by Category</div>
+                            <div class="chart-desc">Top spending categories</div>
+                            <div class="chart-container">
+                                <canvas id="categoryDonutChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Bank / Mode Usage</div>
+                            <div class="chart-desc">Which bank account you used most</div>
+                            <div class="chart-container">
+                                <canvas id="bankPieChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cumulative Balance -->
+                    <div class="charts-grid full mb-6">
+                        <div class="chart-card">
+                            <div class="chart-title">Cumulative Balance Over Time</div>
+                            <div class="chart-desc">Running balance (Credits − Debits) across all transactions</div>
+                            <div class="chart-container">
+                                <canvas id="balanceLineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ───── MONTHLY PAGE ───── -->
+                <section class="page" id="page-monthly">
+                    <div class="charts-grid full mb-6">
+                        <div class="chart-card">
+                            <div class="chart-title">Monthly Breakdown — Bar Chart</div>
+                            <div class="chart-desc">Income vs Expense per month</div>
+                            <div class="chart-container tall">
+                                <canvas id="monthlyBarChart2"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Summary Table -->
+                    <div class="table-card">
+                        <div class="table-toolbar">
+                            <div>
+                                <div class="section-title">Monthly Summary</div>
+                                <div class="section-subtitle">Income, Expenses, and Net Balance per month</div>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="monthly-table" id="monthlyTable">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th># Transactions</th>
+                                        <th>Total Expense</th>
+                                        <th>Total Income</th>
+                                        <th>Net Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="monthlyTableBody">
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="table-empty">
+                                                <div class="empty-icon">📊</div>
+                                                <p>No data loaded</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ───── CATEGORY PAGE ───── -->
+                <section class="page" id="page-category">
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">Expense Categories — Donut</div>
+                            <div class="chart-desc">Where your money went</div>
+                            <div class="chart-container tall">
+                                <canvas id="categoryDonutChart2"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Top Categories by Spend</div>
+                            <div class="chart-desc">Ranked expense breakdown</div>
+                            <div style="margin-top: 8px;">
+                                <div class="category-list" id="categoryList">
+                                    <p class="text-muted" style="font-size:13px;padding:20px 0;">No data loaded</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid full mt-4" style="margin-top: 20px;">
+                        <div class="chart-card">
+                            <div class="chart-title">Category Spending — Bar Chart</div>
+                            <div class="chart-desc">All categories ranked by total amount</div>
+                            <div class="chart-container tall">
+                                <canvas id="categoryBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ───── BANKS PAGE ───── -->
+                <section class="page" id="page-banks">
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">Bank / Mode — Pie Chart</div>
+                            <div class="chart-desc">Distribution of bank usage</div>
+                            <div class="chart-container tall">
+                                <canvas id="bankPieChart2"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Bank Usage — Bar Chart</div>
+                            <div class="chart-desc">Transaction count per bank</div>
+                            <div class="chart-container tall">
+                                <canvas id="bankBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-card" style="margin-top: 20px;">
+                        <div class="table-toolbar">
+                            <div>
+                                <div class="section-title">Bank-wise Summary</div>
+                                <div class="section-subtitle">Total transactions and amount per bank/mode</div>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table id="bankTable">
+                                <thead>
+                                    <tr>
+                                        <th>Bank / Mode</th>
+                                        <th>Transactions</th>
+                                        <th>Total Debit</th>
+                                        <th>Total Credit</th>
+                                        <th>Net</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bankTableBody">
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="table-empty">
+                                                <div class="empty-icon">🏦</div>
+                                                <p>No data loaded</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ───── TRANSACTIONS PAGE ───── -->
+                <section class="page" id="page-transactions">
+                    <div class="table-card">
+                        <div class="table-toolbar">
+                            <div class="toolbar-row">
+                                <div class="search-box">
+                                    <span class="search-icon" aria-hidden="true">🔍</span>
+                                    <input type="text" id="searchInput" placeholder="Search transactions…"
+                                        oninput="App.filterTransactions()" aria-label="Search transactions" />
+                                </div>
+                                <select class="filter-select" id="filterAction" onchange="App.filterTransactions()"
+                                    aria-label="Filter by action">
+                                    <option value="">All Actions</option>
+                                    <option value="Debit">Debit</option>
+                                    <option value="Credit">Credit</option>
+                                </select>
+                                <select class="filter-select" id="filterMode" onchange="App.filterTransactions()"
+                                    aria-label="Filter by bank">
+                                    <option value="">All Banks</option>
+                                </select>
+                                <select class="filter-select" id="filterMonth" onchange="App.filterTransactions()"
+                                    aria-label="Filter by month">
+                                    <option value="">All Months</option>
+                                </select>
+                                <span class="table-count" id="tableCount">0 entries</span>
+                            </div>
+                            <div class="toolbar-row date-range-row">
+                                <span class="date-range-label">📅 Date Range:</span>
+                                <div class="date-input-wrap">
+                                    <label for="dateFrom">From</label>
+                                    <input type="date" id="dateFrom" class="date-input"
+                                        onchange="App.filterTransactions()" aria-label="From date" />
+                                </div>
+                                <div class="date-input-wrap">
+                                    <label for="dateTo">To</label>
+                                    <input type="date" id="dateTo" class="date-input"
+                                        onchange="App.filterTransactions()" aria-label="To date" />
+                                </div>
+                                <button class="clear-dates-btn" onclick="App.clearDateRange()"
+                                    title="Clear date range">✕ Clear</button>
+                                <button class="add-trans-btn" onclick="App.openAddTransactionModal()"
+                                    style="margin-left:auto;">➕ Add</button>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table id="transactionTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th class="sortable" onclick="App.sortTable('date')" aria-sort="none">Date ↕
+                                        </th>
+                                        <th>For What</th>
+                                        <th>Action</th>
+                                        <th>Mode</th>
+                                        <th class="sortable" onclick="App.sortTable('amount')" aria-sort="none">Amount ↕
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionTableBody">
+                                    <tr>
+                                        <td colspan="6">
+                                            <div class="table-empty">
+                                                <div class="empty-icon">📋</div>
+                                                <p>No data loaded yet. Click Refresh or check config.js.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div><!-- end page-content -->
+        </main>
+    </div><!-- end app-layout -->
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script src="charts.js"></script>
+</body>
+
+</html>
