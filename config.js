@@ -13,7 +13,7 @@ const CONFIG = {
   API_KEY: "AIzaSyDNvwgHB_jkAVQ_FQfnTfTkCbh9a8FtqhE",
 
   // Step 3: List all your semester sheet names EXACTLY as they appear in Google Sheets tabs
-  SEMESTERS: ["SEM - 2", "SEM - 1", "CKP"],
+  SEMESTERS: ["SEM - 3","SEM - 2", "SEM - 1", "CKP"],
 
   // Step 4: Exclude these keywords from analytics (e.g. "fee" or "fees")
   // Transactions containing these won't count in your charts/KPIs, but will show in the Transactions table
@@ -24,7 +24,7 @@ const CONFIG = {
   ADD_TRANSACTION_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbzLioIVXziGkdETUiuM3fLOYPTvj1YqOf8R27MRKSZyoO4vLWzAwtfQEsSQIq0jsDDVqQ/exec",
 
   // Currency symbol
-  CURRENCY: "₹",
+  CURRENCY: "",
 
   // Column indices (0-based) matching your sheet structure:
   // Sri No | Date | For What | Action | Mode | Amount | Monthly Expen Month
