@@ -212,7 +212,17 @@ const ChartManager = (() => {
                 indexAxis: "y",
                 plugins: {
                     legend: { display: false },
-                    tooltip: baseTooltip,
+                    tooltip: {
+                        ...baseTooltip,
+                        callbacks: {
+                            title(ctx) {
+                                return `Bar ${ctx[0].dataIndex + 1} — ${ctx[0].label}`;
+                            },
+                            label(ctx) {
+                                return ` Expense: ₹${ctx.parsed.x.toLocaleString("en-IN")}`;
+                            },
+                        },
+                    },
                 },
                 scales: {
                     x: {
